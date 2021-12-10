@@ -5,3 +5,4 @@ pandas
 nbgrader
 asyncio
 nbpickup
+watchdog
