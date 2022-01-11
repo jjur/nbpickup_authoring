@@ -4,5 +4,4 @@ seaborn
 pandas
 nbgrader
 asyncio
-nbpickup
 watchdog
