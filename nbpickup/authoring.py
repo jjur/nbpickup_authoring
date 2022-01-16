@@ -86,6 +86,7 @@ class Authoring():
 
             open(location + "/" + filename, 'wb').write(response.content)
             self.file_records[location + "/" + filename] = file_id
+            print("A", self.file_records)
         else:
             print(response.content)
             #raise Exception(response.content)
@@ -142,6 +143,7 @@ class Authoring():
         response = requests.post(self.server_url + "/API/upload_file", files=files, data=values, headers=self.headers)
         if response.status_code == 200:
             file_id = response.content
+            print("B", self.file_records)
             self.file_records[directory + "/" + file] = file_id
 
         else:
@@ -150,6 +152,7 @@ class Authoring():
     def update_file(self, file, directory):
         """Updates existing file on the nbpickup server"""
         # Skip files starting the name with dot
+        print("File0:", file[0])
         if file[0] == "." or "checkpoint" in file[0]:
             return False
         files = {"file": open(directory + "/" + file, "rb")}
@@ -157,10 +160,13 @@ class Authoring():
                   "path": directory}
 
         # Check if the file is already in our know directory
+        print("Searching for ", directory + "/" + file, "in", self.file_records)
         if directory + "/" + file not in self.file_records:
+            print("Nope, it is a new file")
             return self.upload_file(file,directory)
 
         file_id = self.file_records[directory + "/" + file]
+        print("Trying to update file,",file_id)
         response = requests.post(self.server_url + f"/API/update_file/{file_id}", files=files, data=values, headers=self.headers)
         if response.status_code == 200:
             pass # Nice, updated
@@ -171,9 +177,12 @@ class Authoring():
     def move_file(self, old_location, new_location):
         """Function to handle file movements. Mainly for bookkeeping purposes."""
         directory, filename = get_path_and_filename(new_location)
+        print("Searching for ", old_location, self.file_records)
         if old_location not in self.file_records:
+            print("Not in")
             return self.upload_file(filename,directory)
         else:
+            print("in")
             self.file_records[new_location] = self.file_records[old_location]
             return self.update_file(filename, directory)
 
