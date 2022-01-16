@@ -132,6 +132,7 @@ class Authoring():
     def upload_file(self, file, directory, private=1):
         """Uploads new file to the nbpickup server"""
         # Skip files starting the name with dot
+        print("File0:", file)
         if file[0] == "."  or "checkpoint" in file[0]:
             return False
         files = {"file": open(directory+"/"+file, "rb")}
@@ -152,7 +153,7 @@ class Authoring():
     def update_file(self, file, directory):
         """Updates existing file on the nbpickup server"""
         # Skip files starting the name with dot
-        print("File0:", file[0])
+        print("File0:", file)
         if file[0] == "." or "checkpoint" in file[0]:
             return False
         files = {"file": open(directory + "/" + file, "rb")}
