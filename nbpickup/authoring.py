@@ -196,8 +196,10 @@ class Authoring():
 
         file_id = self.file_records[directory + "/" + file]
         print(file_id)
+        print(values)
         response = requests.post(self.server_url + f"/API/update_file/{file_id}", files=files, data=values,
                                  headers=self.headers)
+        print(response.content)
         if response.status_code == 200:
             logger.error(
                 "UPDATE_FILE| File autosaved" + ": " + str(response.content))  # Nice, updated
