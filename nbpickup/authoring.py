@@ -125,7 +125,7 @@ class Authoring():
 
         observer.schedule(event_handler_source, self.source_folder, recursive=True)
         observer.schedule(event_handler_release, self.release_folder, recursive=True)
-        observer.schedule(event_handler_gradebook, "gradebook.db")
+        observer.schedule(event_handler_gradebook, os.path.join(os.getcwd(), "gradebook.db"))
         observer.start()
 
         loop = asyncio.get_event_loop()
@@ -169,7 +169,7 @@ class Authoring():
                 values[key] = additional_data[key]
         response = requests.post(self.server_url + "/API/upload_file", files=files, data=values, headers=self.headers)
         if response.status_code == 200:
-            file_id = response.text
+            file_id = int(response.text)
             self.file_records[directory + "/" + file] = file_id
 
         else:
@@ -197,10 +197,9 @@ class Authoring():
         file_id = self.file_records[directory + "/" + file]
         response = requests.post(self.server_url + f"/API/update_file/{file_id}", files=files, data=values,
                                  headers=self.headers)
-        print(response.content)
         if response.status_code == 200:
-            logger.info(
-                "UPDATE_FILE| File autosaved" + str(file) + ": ")  # Nice, updated
+            logger.info("UPDATE_FILE| File autosaved" + str(file) + ": ")  # Nice, updated
+            pass  # Nice, updated
 
         else:
             logger.error(
@@ -217,6 +216,7 @@ class Authoring():
 
 
     def update_gradebook_file(self, filename, path):
+        """Performs preprocessing of gradebook file and then uploads Gradebook as file"""
         num_assignments, num_students = get_gradebook_content_stats(filename, path)
 
         metrics = {"stats_students": num_students,
@@ -226,9 +226,8 @@ class Authoring():
         return self.upload_file(filename,path, additional_data=metrics)
 
 
-
-
     def upload_gradebook_file(self, filename, path):
+        """Performs preprocessing of gradebook file and then uploads Gradebook as file"""
         num_assignments, num_students = get_gradebook_content_stats(filename, path)
 
         metrics = {"stats_students": num_students,
