@@ -5,8 +5,11 @@ import asyncio
 import logging
 
 from watchdog.observers import Observer
+from nbpickup.EventHandlers.autosave_authoring import AutoSaveEventHandler
+from nbpickup.EventHandlers.autosave_gradebook import GradebookAutoSaveEventHandler
 from watchdog.events import FileSystemEventHandler
 
+from nbpickup.gradebook_tools import get_gradebook_content_stats
 # Setting up the logging
 logger = logging.getLogger(__name__)
 
@@ -19,7 +22,9 @@ log_console.setLevel(logging.WARNING)
 log_file.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 log_console.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
 
-logger.addHandler(log_file).addHandler(log_console)
+logger.addHandler(log_file)
+logger.addHandler(log_console)
+logger.setLevel(logging.DEBUG)
 
 
 def get_path_and_filename(full_path):
@@ -115,10 +120,12 @@ class Authoring():
 
         event_handler_source = AutoSaveEventHandler(self, self.source_folder, private=1)
         event_handler_release = AutoSaveEventHandler(self, self.release_folder, private=0)
+        event_handler_gradebook = GradebookAutoSaveEventHandler(self)
         observer = Observer()
 
         observer.schedule(event_handler_source, self.source_folder, recursive=True)
         observer.schedule(event_handler_release, self.release_folder, recursive=True)
+        observer.schedule(event_handler_gradebook, "gradebook.db")
         observer.start()
 
         loop = asyncio.get_event_loop()
@@ -145,7 +152,7 @@ class Authoring():
         <a id="btn_release_folder" target="_blank" href="../tree/release/{self.alias}" class="btn btn-primary">Open Student´s version Folder</a>
         <a id="btn_nbgrader" target="_blank" href="../formgrader" class="btn btn-primary">Open nbgrader</a>"""))
 
-    def upload_file(self, file, directory, private=1):
+    def upload_file(self, file, directory, private=1, additional_data=None):
         """Uploads new file to the nbpickup server"""
         # Skip files starting the name with dot
         if file[0] == "." or "checkpoint" in file:
@@ -155,7 +162,11 @@ class Authoring():
                   "path": directory,
                   "assignment": self.assignment["a_id"],
                   "private": private,
-                  }
+                  "filetype": "file"}
+
+        if additional_data:
+            for key in additional_data:
+                values[key] = additional_data[key]
         response = requests.post(self.server_url + "/API/upload_file", files=files, data=values, headers=self.headers)
         if response.status_code == 200:
             file_id = response.content
@@ -165,14 +176,19 @@ class Authoring():
             logger.error(
                 "UPLOAD_FILE|Server responded with code " + str(response.status_code) + ": " + str(response.content))
 
-    def update_file(self, file, directory):
+    def update_file(self, file, directory, additional_data=None):
         """Updates existing file on the nbpickup server"""
         # Skip files starting the name with dot
         if file[0] == "." or "checkpoint" in file:
             return False
         files = {"file": open(directory + "/" + file, "rb")}
         values = {"filename": file,
-                  "path": directory}
+                  "path": directory,
+                  "filetype": "file"}
+
+        if additional_data:
+            for key in additional_data:
+                values[key] = additional_data[key]
 
         # Check if the file is already in our know directory
         if directory + "/" + file not in self.file_records:
@@ -198,49 +214,24 @@ class Authoring():
             return self.update_file(filename, directory)
 
 
-class AutoSaveEventHandler(FileSystemEventHandler):
-    """Captures and deals with autosaving of nbpickup files"""
+    def update_gradebook_file(self, filename, path):
+        num_assignments, num_students = get_gradebook_content_stats(filename, path)
 
-    def __init__(self, nbpickup, folder, private=1):
-        super().__init__()
+        metrics = {"stats_students": num_students,
+                   "stats_assignments": num_assignments,
+                   "filetype":"gradebook"}
 
-        self.nbpickup = nbpickup
-        self.private = private
-        self.folder = folder
+        return self.update_file(filename,path, additional_data=metrics)
 
-    def on_moved(self, event):
-        """Handles both rename and move events"""
-        super().on_moved(event)
 
-        what = 'directory' if event.is_directory else 'file'
-        logger.info("Moved %s: from %s to %s" % (what, event.src_path, event.dest_path))
 
-        if not event.is_directory:
-            self.nbpickup.move_file(event.src_path, event.dest_path)
 
-    def on_created(self, event):
-        super().on_created(event)
+    def upload_gradebook_file(self, filename, path):
+        num_assignments, num_students = get_gradebook_content_stats(filename, path)
 
-        what = 'directory' if event.is_directory else 'file'
+        metrics = {"stats_students": num_students,
+                   "stats_assignments": num_assignments,
+                   "filetype": "gradebook"}
 
-        logger.info("Created %s: %s" % (what, event.src_path))
-        if not event.is_directory:
-            path = "/".join(event.src_path.split("/")[:-1])
-            filename = event.src_path.split("/")[-1]
-            self.nbpickup.upload_file(filename, path, self.private)
+        return self.upload_file(filename, path, additional_data=metrics)
 
-    def on_deleted(self, event):
-        super().on_deleted(event)
-
-        what = 'directory' if event.is_directory else 'file'
-        logger.info("Deleted %s: %s" % (what, event.src_path))
-
-    def on_modified(self, event):
-        super().on_modified(event)
-
-        what = 'directory' if event.is_directory else 'file'
-        logger.info("Modified %s: %s" % (what, event.src_path))
-        if not event.is_directory:
-            path = "/".join(event.src_path.split("/")[:-1])
-            filename = event.src_path.split("/")[-1]
-            self.nbpickup.update_file(filename, path)
