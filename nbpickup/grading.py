@@ -102,6 +102,7 @@ class Grading():
             if not os.path.exists(os.getcwd() + "/submitted/" + username + "/" + folder):
                 os.makedirs(os.getcwd() + "/submitted/" + username + "/" + folder)
 
+
             # download file
             url = self.server_url + "/Student/get_submission/" + row["f_filename_internal"]
             r = requests.get(url, allow_redirects=True)
