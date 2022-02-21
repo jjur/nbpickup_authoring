@@ -3,5 +3,6 @@ matplotlib
 seaborn
 pandas
 nbgrader
+nbpickup==0.9.1
 asyncio
 watchdog
